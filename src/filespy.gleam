@@ -94,6 +94,18 @@ pub fn add_dir(
   )
 }
 
+/// Add multiple directories at once
+pub fn add_dirs(
+  builder: Builder(a, d, h, s),
+  directories: List(String),
+) -> Builder(a, HasDirectories, h, s) {
+  Builder(
+    initial_state: builder.initial_state,
+    handler: builder.handler,
+    dirs: list.append(directories, builder.dirs),
+  )
+}
+
 /// Set the handler
 ///
 /// # Examples
