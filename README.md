@@ -1,6 +1,6 @@
 # filespy
 
-[![Package Version](https://img.shields.io/hexpm/v/fs)](https://hex.pm/packages/filespy)
+[![Package Version](https://img.shields.io/hexpm/v/filespy)](https://hex.pm/packages/filespy)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/filespy/)
 
 Filespy is a small library and versatile library that allows you to watch for filesystem events from Gleam! It's a type-safe wrapper around the erlang [FS](https://github.com/5HT/fs) library.
