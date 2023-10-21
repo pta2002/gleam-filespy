@@ -1,7 +1,7 @@
 # fs
 
-[![Package Version](https://img.shields.io/hexpm/v/fs)](https://hex.pm/packages/fs)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/fs/)
+[![Package Version](https://img.shields.io/hexpm/v/fs)](https://hex.pm/packages/filespy)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/filespy/)
 
 ## Quick start
 
@@ -13,10 +13,8 @@ gleam shell # Run an Erlang shell
 
 ## Installation
 
-If available on Hex this package can be added to your Gleam project:
-
 ```sh
-gleam add fs
+gleam add filespy
 ```
 
 and its documentation can be found at <https://hexdocs.pm/fs>.

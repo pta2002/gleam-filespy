@@ -7,21 +7,36 @@
 import gleam/option.{None, Option, Some}
 import gleam/otp/actor.{ErlangStartResult}
 import gleam/erlang/atom.{Atom}
-import gleam/otp/supervisor
 import gleam/erlang/process
-import gleam/io
 import gleam/dynamic
 import gleam/string
 import gleam/erlang/charlist
 import gleam/result
 import gleam/list
 
+/// Possible filesystem events
+pub type Event {
+  Created
+  Modified
+  Closed
+  Deleted
+  Renamed
+  Attribute
+  Unknown(Atom)
+}
+
+/// A filesystem change
+pub type Change {
+  Change(path: String, events: List(Event))
+}
+
 /// Handler function called when an event is detected
 pub type Handler =
-  fn(String, Atom) -> Nil
+  fn(String, Event) -> Nil
 
+/// Handler function used with an actor handler
 pub type ActorHandler(a) =
-  fn(Event, a) -> actor.Next(Event, a)
+  fn(Change, a) -> actor.Next(Change, a)
 
 /// Opaque builder type to instantiate the listener
 ///
@@ -72,7 +87,10 @@ pub fn add_dir(builder: Builder(a), directory: String) -> Builder(a) {
 ///   }
 /// })
 pub fn set_handler(builder: Builder(Nil), handler: Handler) -> Builder(Nil) {
-  let wrapped_handler = fn(event: Event, _state: Nil) -> actor.Next(Event, Nil) {
+  let wrapped_handler = fn(event: Change, _state: Nil) -> actor.Next(
+    Change,
+    Nil,
+  ) {
     let Change(path, events) = event
     list.each(events, fn(ev) { handler(path, ev) })
     actor.continue(Nil)
@@ -106,13 +124,32 @@ fn fs_start_link(name: Atom, path: String) -> ErlangStartResult
 @external(erlang, "fs", "subscribe")
 fn fs_subscribe(name: Atom) -> Atom
 
-/// A filesystem event
-pub type Event {
-  Change(path: String, events: List(Atom))
+/// Converts an atom to an event
+fn to_event(from: dynamic.Dynamic) -> Result(Event, List(dynamic.DecodeError)) {
+  use event <- result.try(atom.from_dynamic(from))
+
+  let created = atom.create_from_string("created")
+  let deleted = atom.create_from_string("deleted")
+  let modified = atom.create_from_string("modified")
+  let closed = atom.create_from_string("closed")
+  let renamed = atom.create_from_string("renamed")
+  let attrib = atom.create_from_string("attribute")
+  let removed = atom.create_from_string("removed")
+
+  case event {
+    ev if ev == created -> Ok(Created)
+    ev if ev == deleted -> Ok(Deleted)
+    ev if ev == modified -> Ok(Modified)
+    ev if ev == closed -> Ok(Closed)
+    ev if ev == renamed -> Ok(Renamed)
+    ev if ev == removed -> Ok(Deleted)
+    ev if ev == attrib -> Ok(Attribute)
+    other -> Ok(Unknown(other))
+  }
 }
 
 /// Get a `Selector` which can be used to select for filesystem events.
-pub fn selector() -> process.Selector(Event) {
+pub fn selector() -> process.Selector(Change) {
   process.new_selector()
   |> process.selecting_anything(fn(event) {
     let assert Ok(#(_pid, _, #(path, events))) =
@@ -125,7 +162,7 @@ pub fn selector() -> process.Selector(Event) {
             |> charlist.to_string
             |> Ok
           },
-          dynamic.list(of: atom.from_dynamic),
+          dynamic.list(of: to_event),
         ),
       )(event)
 
@@ -134,7 +171,7 @@ pub fn selector() -> process.Selector(Event) {
 }
 
 /// Get an actor `Spec` for the watcher
-pub fn spec(builder: Builder(a)) -> actor.Spec(a, Event) {
+pub fn spec(builder: Builder(a)) -> actor.Spec(a, Change) {
   let assert Some(handler) = builder.handler
   let assert Some(initial_state) = builder.initial_state
 
@@ -183,7 +220,7 @@ pub fn spec(builder: Builder(a)) -> actor.Spec(a, Event) {
 /// `set_actor_handler` and `set_initial_state`.
 pub fn start(
   builder: Builder(a),
-) -> Result(process.Subject(Event), actor.StartError) {
+) -> Result(process.Subject(Change), actor.StartError) {
   spec(builder)
   |> actor.start_spec
 }
