@@ -14,6 +14,24 @@ import gleam/erlang/charlist
 import gleam/result
 import gleam/list
 
+/// Phantom type to indicate the Builder has no directories
+pub type NoDirectories
+
+/// Phantom type to indicate the Builder has directories
+pub type HasDirectories
+
+/// Phantom type to indicate the Builder has no handlers
+pub type NoHandler
+
+/// Phantom type to indicate the Builder has a handler
+pub type HasHandler
+
+/// Phantom type to indicate the Builder has no initial state
+pub type NoInitialState
+
+/// Phantom type to indicate the Builder has an initial state
+pub type HasInitialState
+
 /// Possible filesystem events
 pub type Event {
   Created
@@ -41,7 +59,7 @@ pub type ActorHandler(a) =
 /// Opaque builder type to instantiate the listener
 ///
 /// Instantiate it with `new`.
-pub opaque type Builder(a) {
+pub opaque type Builder(a, d, h, s) {
   Builder(
     dirs: List(String),
     handler: Option(ActorHandler(a)),
@@ -53,7 +71,7 @@ pub opaque type Builder(a) {
 ///
 /// Use this with the `add_dir` and `handler` functions to configure the
 /// watcher
-pub fn new() -> Builder(a) {
+pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState) {
   Builder(dirs: [], handler: None, initial_state: None)
 }
 
@@ -65,8 +83,15 @@ pub fn new() -> Builder(a) {
 /// filespy.new()
 /// |> filespy.add_dir("./watched")
 /// ```
-pub fn add_dir(builder: Builder(a), directory: String) -> Builder(a) {
-  Builder(..builder, dirs: [directory, ..builder.dirs])
+pub fn add_dir(
+  builder: Builder(a, d, h, s),
+  directory: String,
+) -> Builder(a, HasDirectories, h, s) {
+  Builder(
+    initial_state: builder.initial_state,
+    handler: builder.handler,
+    dirs: [directory, ..builder.dirs],
+  )
 }
 
 /// Set the handler
@@ -86,7 +111,10 @@ pub fn add_dir(builder: Builder(a), directory: String) -> Builder(a) {
 ///       }
 ///   }
 /// })
-pub fn set_handler(builder: Builder(Nil), handler: Handler) -> Builder(Nil) {
+pub fn set_handler(
+  builder: Builder(Nil, d, NoHandler, NoInitialState),
+  handler: Handler,
+) -> Builder(Nil, d, HasHandler, HasInitialState) {
   let wrapped_handler = fn(event: Change, _state: Nil) -> actor.Next(
     Change,
     Nil,
@@ -95,7 +123,9 @@ pub fn set_handler(builder: Builder(Nil), handler: Handler) -> Builder(Nil) {
     list.each(events, fn(ev) { handler(path, ev) })
     actor.continue(Nil)
   }
-  Builder(..builder, handler: Some(wrapped_handler), initial_state: Some(Nil))
+  builder
+  |> set_actor_handler(wrapped_handler)
+  |> set_initial_state(Nil)
 }
 
 /// Set the actor handler
@@ -103,10 +133,14 @@ pub fn set_handler(builder: Builder(Nil), handler: Handler) -> Builder(Nil) {
 /// Use this if you want to have a more thorough control over the generated
 /// actor. You will also need to set an initial state, with `set_initial_state`.
 pub fn set_actor_handler(
-  builder: Builder(a),
+  builder: Builder(a, d, NoHandler, s),
   handler: ActorHandler(a),
-) -> Builder(a) {
-  Builder(..builder, handler: Some(handler))
+) -> Builder(a, d, HasHandler, s) {
+  Builder(
+    initial_state: builder.initial_state,
+    dirs: builder.dirs,
+    handler: Some(handler),
+  )
 }
 
 /// Set the initial state
@@ -114,8 +148,15 @@ pub fn set_actor_handler(
 /// Use this if you want to have a more thorough control over the generated
 /// actor. You'll only have access to this state if you set your handler with
 /// `set_actor_handler`.
-pub fn set_initial_state(builder: Builder(a), state: a) -> Builder(a) {
-  Builder(..builder, initial_state: Some(state))
+pub fn set_initial_state(
+  builder: Builder(a, d, h, NoInitialState),
+  state: a,
+) -> Builder(a, d, h, HasInitialState) {
+  Builder(
+    dirs: builder.dirs,
+    handler: builder.handler,
+    initial_state: Some(state),
+  )
 }
 
 @external(erlang, "fs", "start_link")
@@ -171,7 +212,9 @@ pub fn selector() -> process.Selector(Change) {
 }
 
 /// Get an actor `Spec` for the watcher
-pub fn spec(builder: Builder(a)) -> actor.Spec(a, Change) {
+pub fn spec(
+  builder: Builder(a, HasDirectories, HasHandler, HasInitialState),
+) -> actor.Spec(a, Change) {
   let assert Some(handler) = builder.handler
   let assert Some(initial_state) = builder.initial_state
 
@@ -219,7 +262,7 @@ pub fn spec(builder: Builder(a)) -> actor.Spec(a, Change) {
 /// watched, with `add_dir`, and set a handler with either `set_handler` or
 /// `set_actor_handler` and `set_initial_state`.
 pub fn start(
-  builder: Builder(a),
+  builder: Builder(a, HasDirectories, HasHandler, HasInitialState),
 ) -> Result(process.Subject(Change), actor.StartError) {
   spec(builder)
   |> actor.start_spec
