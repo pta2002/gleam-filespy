@@ -63,7 +63,7 @@ pub opaque type Builder(a, d, h, s) {
   Builder(
     dirs: List(String),
     handler: Option(ActorHandler(a)),
-    initial_state: Option(a),
+    initializer: Option(fn() -> a),
   )
 }
 
@@ -72,7 +72,7 @@ pub opaque type Builder(a, d, h, s) {
 /// Use this with the `add_dir` and `handler` functions to configure the
 /// watcher
 pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState) {
-  Builder(dirs: [], handler: None, initial_state: None)
+  Builder(dirs: [], handler: None, initializer: None)
 }
 
 /// Add a directory to watch
@@ -88,7 +88,7 @@ pub fn add_dir(
   directory: String,
 ) -> Builder(a, HasDirectories, h, s) {
   Builder(
-    initial_state: builder.initial_state,
+    initializer: builder.initializer,
     handler: builder.handler,
     dirs: [directory, ..builder.dirs],
   )
@@ -100,7 +100,7 @@ pub fn add_dirs(
   directories: List(String),
 ) -> Builder(a, HasDirectories, h, s) {
   Builder(
-    initial_state: builder.initial_state,
+    initializer: builder.initializer,
     handler: builder.handler,
     dirs: list.append(directories, builder.dirs),
   )
@@ -149,7 +149,7 @@ pub fn set_actor_handler(
   handler: ActorHandler(a),
 ) -> Builder(a, d, HasHandler, s) {
   Builder(
-    initial_state: builder.initial_state,
+    initializer: builder.initializer,
     dirs: builder.dirs,
     handler: Some(handler),
   )
@@ -167,7 +167,23 @@ pub fn set_initial_state(
   Builder(
     dirs: builder.dirs,
     handler: builder.handler,
-    initial_state: Some(state),
+    initializer: Some(fn() { state }),
+  )
+}
+
+/// Set the initializer
+///
+/// Use this if you want to, for example, return a subject in the state. The
+/// initializer will run in the actor's `on_init`, so it'll run under the
+/// watcher process
+pub fn set_initializer(
+  builder: Builder(a, d, h, NoInitialState),
+  initializer: fn() -> a,
+) -> Builder(a, d, h, HasInitialState) {
+  Builder(
+    dirs: builder.dirs,
+    handler: builder.handler,
+    initializer: Some(initializer),
   )
 }
 
@@ -228,7 +244,7 @@ pub fn spec(
   builder: Builder(a, HasDirectories, HasHandler, HasInitialState),
 ) -> actor.Spec(a, Change) {
   let assert Some(handler) = builder.handler
-  let assert Some(initial_state) = builder.initial_state
+  let assert Some(initializer) = builder.initializer
 
   actor.Spec(
     init: fn() {
@@ -249,7 +265,7 @@ pub fn spec(
             let #(_pid, atom) = res
             fs_subscribe(atom)
           })
-          actor.Ready(initial_state, selector())
+          actor.Ready(initializer(), selector())
         }
         errs -> {
           list.each(
