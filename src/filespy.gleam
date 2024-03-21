@@ -4,9 +4,9 @@
 ////
 //// Note: on Linux and BSD, you need `inotify-tools` installed.
 
-import gleam/option.{None, Option, Some}
-import gleam/otp/actor.{ErlangStartResult}
-import gleam/erlang/atom.{Atom}
+import gleam/option.{type Option, None, Some}
+import gleam/otp/actor.{type ErlangStartResult}
+import gleam/erlang/atom.{type Atom}
 import gleam/erlang/process
 import gleam/dynamic
 import gleam/string
