@@ -6,10 +6,10 @@ licences = ["Apache-2.0"]
 repository = { type = "github", user = "pta2002", repo = "gleam-filespy" }
 
 [dependencies]
-gleam_stdlib = "~> 0.31"
-gleam_otp = "~> 0.7"
-gleam_erlang = "~> 0.22"
+gleam_stdlib = "~> 0.36.0"
+gleam_otp = "~> 0.10"
+gleam_erlang = "~> 0.25"
 fs = "~> 8.6"
 
 [dev-dependencies]
-gleeunit = "~> 0.10"
+gleeunit = "~> 1.0.2"
