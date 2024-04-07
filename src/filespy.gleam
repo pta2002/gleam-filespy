@@ -219,23 +219,26 @@ fn to_event(from: dynamic.Dynamic) -> Result(Event, List(dynamic.DecodeError)) {
 
 /// Get a `Selector` which can be used to select for filesystem events.
 pub fn selector() -> process.Selector(Change) {
+  let change_selector =
+    dynamic.tuple3(
+      dynamic.dynamic,
+      dynamic.dynamic,
+      dynamic.tuple2(
+        fn(l) {
+          dynamic.unsafe_coerce(l)
+          |> charlist.to_string
+          |> Ok
+        },
+        dynamic.list(of: to_event),
+      ),
+    )
+
   process.new_selector()
   |> process.selecting_anything(fn(event) {
-    let assert Ok(#(_pid, _, #(path, events))) =
-      dynamic.tuple3(
-        dynamic.dynamic,
-        dynamic.dynamic,
-        dynamic.tuple2(
-          fn(l) {
-            dynamic.unsafe_coerce(l)
-            |> charlist.to_string
-            |> Ok
-          },
-          dynamic.list(of: to_event),
-        ),
-      )(event)
-
-    Change(path: path, events: events)
+    case change_selector(event) {
+      Ok(#(_pid, _, #(path, events))) -> Change(path: path, events: events)
+      _ -> Change(path: "", events: [])
+    }
   })
 }
 
