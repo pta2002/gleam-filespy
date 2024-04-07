@@ -87,11 +87,10 @@ pub fn add_dir(
   builder: Builder(a, d, h, s),
   directory: String,
 ) -> Builder(a, HasDirectories, h, s) {
-  Builder(
-    initializer: builder.initializer,
-    handler: builder.handler,
-    dirs: [directory, ..builder.dirs],
-  )
+  Builder(initializer: builder.initializer, handler: builder.handler, dirs: [
+    directory,
+    ..builder.dirs
+  ])
 }
 
 /// Add multiple directories at once
@@ -271,13 +270,10 @@ pub fn spec(
           actor.Ready(initializer(), selector())
         }
         errs -> {
-          list.each(
-            oks,
-            fn(res) {
-              let #(pid, _atom) = res
-              process.kill(pid)
-            },
-          )
+          list.each(oks, fn(res) {
+            let #(pid, _atom) = res
+            process.kill(pid)
+          })
           actor.Failed("Failed to start watcher: " <> string.inspect(errs))
         }
       }
