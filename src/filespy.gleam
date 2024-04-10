@@ -44,8 +44,9 @@ pub type Event {
 }
 
 /// A filesystem change
-pub type Change {
+pub type Change(custom) {
   Change(path: String, events: List(Event))
+  Custom(custom)
 }
 
 /// Handler function called when an event is detected
@@ -53,16 +54,16 @@ pub type Handler =
   fn(String, Event) -> Nil
 
 /// Handler function used with an actor handler
-pub type ActorHandler(a) =
-  fn(Change, a) -> actor.Next(Change, a)
+pub type ActorHandler(a, custom) =
+  fn(Change(custom), a) -> actor.Next(Change(custom), a)
 
 /// Opaque builder type to instantiate the listener
 ///
 /// Instantiate it with `new`.
-pub opaque type Builder(a, d, h, s) {
+pub opaque type Builder(a, d, h, s, custom) {
   Builder(
     dirs: List(String),
-    handler: Option(ActorHandler(a)),
+    handler: Option(ActorHandler(a, custom)),
     initializer: Option(fn() -> a),
   )
 }
@@ -71,7 +72,7 @@ pub opaque type Builder(a, d, h, s) {
 ///
 /// Use this with the `add_dir` and `handler` functions to configure the
 /// watcher
-pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState) {
+pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState, Nil) {
   Builder(dirs: [], handler: None, initializer: None)
 }
 
@@ -84,9 +85,9 @@ pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState) {
 /// |> filespy.add_dir("./watched")
 /// ```
 pub fn add_dir(
-  builder: Builder(a, d, h, s),
+  builder: Builder(a, d, h, s, custom),
   directory: String,
-) -> Builder(a, HasDirectories, h, s) {
+) -> Builder(a, HasDirectories, h, s, custom) {
   Builder(initializer: builder.initializer, handler: builder.handler, dirs: [
     directory,
     ..builder.dirs
@@ -95,9 +96,9 @@ pub fn add_dir(
 
 /// Add multiple directories at once
 pub fn add_dirs(
-  builder: Builder(a, d, h, s),
+  builder: Builder(a, d, h, s, custom),
   directories: List(String),
-) -> Builder(a, HasDirectories, h, s) {
+) -> Builder(a, HasDirectories, h, s, custom) {
   Builder(
     initializer: builder.initializer,
     handler: builder.handler,
@@ -123,15 +124,19 @@ pub fn add_dirs(
 ///   }
 /// })
 pub fn set_handler(
-  builder: Builder(Nil, d, NoHandler, NoInitialState),
+  builder: Builder(Nil, d, NoHandler, NoInitialState, custom),
   handler: Handler,
-) -> Builder(Nil, d, HasHandler, HasInitialState) {
-  let wrapped_handler = fn(event: Change, _state: Nil) -> actor.Next(
-    Change,
+) -> Builder(Nil, d, HasHandler, HasInitialState, custom) {
+  let wrapped_handler = fn(event: Change(custom), _state: Nil) -> actor.Next(
+    Change(custom),
     Nil,
   ) {
-    let Change(path, events) = event
-    list.each(events, fn(ev) { handler(path, ev) })
+    case event {
+      Change(path, events) -> {
+        list.each(events, fn(ev) { handler(path, ev) })
+      }
+      _ -> Nil
+    }
     actor.continue(Nil)
   }
   builder
@@ -144,9 +149,9 @@ pub fn set_handler(
 /// Use this if you want to have a more thorough control over the generated
 /// actor. You will also need to set an initial state, with `set_initial_state`.
 pub fn set_actor_handler(
-  builder: Builder(a, d, NoHandler, s),
-  handler: ActorHandler(a),
-) -> Builder(a, d, HasHandler, s) {
+  builder: Builder(a, d, NoHandler, s, custom),
+  handler: ActorHandler(a, custom),
+) -> Builder(a, d, HasHandler, s, custom) {
   Builder(
     initializer: builder.initializer,
     dirs: builder.dirs,
@@ -160,9 +165,9 @@ pub fn set_actor_handler(
 /// actor. You'll only have access to this state if you set your handler with
 /// `set_actor_handler`.
 pub fn set_initial_state(
-  builder: Builder(a, d, h, NoInitialState),
+  builder: Builder(a, d, h, NoInitialState, custom),
   state: a,
-) -> Builder(a, d, h, HasInitialState) {
+) -> Builder(a, d, h, HasInitialState, custom) {
   Builder(
     dirs: builder.dirs,
     handler: builder.handler,
@@ -176,9 +181,9 @@ pub fn set_initial_state(
 /// initializer will run in the actor's `on_init`, so it'll run under the
 /// watcher process
 pub fn set_initializer(
-  builder: Builder(a, d, h, NoInitialState),
+  builder: Builder(a, d, h, NoInitialState, custom),
   initializer: fn() -> a,
-) -> Builder(a, d, h, HasInitialState) {
+) -> Builder(a, d, h, HasInitialState, custom) {
   Builder(
     dirs: builder.dirs,
     handler: builder.handler,
@@ -217,7 +222,7 @@ fn to_event(from: dynamic.Dynamic) -> Result(Event, List(dynamic.DecodeError)) {
 }
 
 /// Get a `Selector` which can be used to select for filesystem events.
-pub fn selector() -> process.Selector(Change) {
+pub fn selector() -> process.Selector(Change(custom)) {
   let change_selector =
     dynamic.tuple3(
       dynamic.dynamic,
@@ -243,8 +248,8 @@ pub fn selector() -> process.Selector(Change) {
 
 /// Get an actor `Spec` for the watcher
 pub fn spec(
-  builder: Builder(a, HasDirectories, HasHandler, HasInitialState),
-) -> actor.Spec(a, Change) {
+  builder: Builder(a, HasDirectories, HasHandler, HasInitialState, custom),
+) -> actor.Spec(a, Change(custom)) {
   let assert Some(handler) = builder.handler
   let assert Some(initializer) = builder.initializer
 
@@ -289,8 +294,8 @@ pub fn spec(
 /// watched, with `add_dir`, and set a handler with either `set_handler` or
 /// `set_actor_handler` and `set_initial_state`.
 pub fn start(
-  builder: Builder(a, HasDirectories, HasHandler, HasInitialState),
-) -> Result(process.Subject(Change), actor.StartError) {
+  builder: Builder(a, HasDirectories, HasHandler, HasInitialState, custom),
+) -> Result(process.Subject(Change(custom)), actor.StartError) {
   spec(builder)
   |> actor.start_spec
 }
