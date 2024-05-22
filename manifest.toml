@@ -13,5 +13,5 @@ packages = [
 fs = { version = "~> 8.6" }
 gleam_erlang = { version = "~> 0.25" }
 gleam_otp = { version = "~> 0.10" }
-gleam_stdlib = { version = "~> 0.36.0" }
+gleam_stdlib = { version = ">= 0.36.0 and <= 0.37.0" }
 gleeunit = { version = "~> 1.0.2" }
