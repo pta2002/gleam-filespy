@@ -4,15 +4,18 @@
 ////
 //// Note: on Linux and BSD, you need `inotify-tools` installed.
 
+import gleam/dynamic
+import gleam/erlang/atom.{type Atom}
+import gleam/erlang/charlist
+import gleam/erlang/process
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/otp/actor.{type ErlangStartResult}
-import gleam/erlang/atom.{type Atom}
-import gleam/erlang/process
-import gleam/dynamic
-import gleam/string
-import gleam/erlang/charlist
 import gleam/result
-import gleam/list
+import gleam/string
+
+@external(erlang, "filespy_ffi", "identity")
+fn coerce(value: a) -> b
 
 /// Phantom type to indicate the Builder has no directories
 pub type NoDirectories
@@ -79,7 +82,7 @@ pub fn new() -> Builder(a, NoDirectories, NoHandler, NoInitialState, Nil) {
 /// Add a directory to watch
 ///
 /// # Examples
-/// 
+///
 /// ```gleam
 /// filespy.new()
 /// |> filespy.add_dir("./watched")
@@ -229,7 +232,7 @@ pub fn selector() -> process.Selector(Change(custom)) {
       dynamic.dynamic,
       dynamic.tuple2(
         fn(l) {
-          dynamic.unsafe_coerce(l)
+          coerce(l)
           |> charlist.to_string
           |> Ok
         },
