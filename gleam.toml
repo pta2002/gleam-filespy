@@ -1,5 +1,5 @@
 name = "filespy"
-version = "0.4.0"
+version = "0.5.0"
 
 description = "Get notified of filesystem events in Gleam"
 licences = ["Apache-2.0"]
