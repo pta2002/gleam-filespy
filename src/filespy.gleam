@@ -4,7 +4,7 @@
 ////
 //// Note: on Linux and BSD, you need `inotify-tools` installed.
 
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/erlang/atom.{type Atom}
 import gleam/erlang/charlist
 import gleam/erlang/process
@@ -200,53 +200,59 @@ fn fs_start_link(name: Atom, path: String) -> ErlangStartResult
 @external(erlang, "fs", "subscribe")
 fn fs_subscribe(name: Atom) -> Atom
 
-/// Converts an atom to an event
-fn to_event(from: dynamic.Dynamic) -> Result(Event, List(dynamic.DecodeError)) {
-  use event <- result.try(atom.from_dynamic(from))
-
-  let created = atom.create_from_string("created")
-  let deleted = atom.create_from_string("deleted")
-  let modified = atom.create_from_string("modified")
-  let closed = atom.create_from_string("closed")
-  let renamed = atom.create_from_string("renamed")
-  let attrib = atom.create_from_string("attribute")
-  let removed = atom.create_from_string("removed")
-
-  case event {
-    ev if ev == created -> Ok(Created)
-    ev if ev == deleted -> Ok(Deleted)
-    ev if ev == modified -> Ok(Modified)
-    ev if ev == closed -> Ok(Closed)
-    ev if ev == renamed -> Ok(Renamed)
-    ev if ev == removed -> Ok(Deleted)
-    ev if ev == attrib -> Ok(Attribute)
-    other -> Ok(Unknown(other))
+/// Decode an atom to an `Event`.
+fn event_decoder() -> decode.Decoder(Event) {
+  use content <- decode.then(decode.dynamic)
+  case atom.from_dynamic(content) {
+    Error(_) -> decode.failure(Created, "Event")
+    Ok(event) -> {
+      let created = atom.create_from_string("created")
+      let deleted = atom.create_from_string("deleted")
+      let modified = atom.create_from_string("modified")
+      let closed = atom.create_from_string("closed")
+      let renamed = atom.create_from_string("renamed")
+      let attrib = atom.create_from_string("attribute")
+      let removed = atom.create_from_string("removed")
+      case event {
+        ev if ev == created -> decode.success(Created)
+        ev if ev == deleted -> decode.success(Deleted)
+        ev if ev == modified -> decode.success(Modified)
+        ev if ev == closed -> decode.success(Closed)
+        ev if ev == renamed -> decode.success(Renamed)
+        ev if ev == removed -> decode.success(Deleted)
+        ev if ev == attrib -> decode.success(Attribute)
+        other -> decode.success(Unknown(other))
+      }
+    }
   }
+}
+
+/// Decode a [`charlist`](https://hexdocs.pm/gleam_erlang/gleam/erlang/charlist.html#Charlist)
+/// from a `Dynamic` value, and convert it to `String`.
+fn charlist_decoder() -> decode.Decoder(String) {
+  use chars <- decode.map(decode.dynamic)
+  charlist.to_string(coerce(chars))
+}
+
+/// Decode `fs` events. Return type is `#(Pid, FileEvent, #(Path, List(Event)))`.
+fn change_decoder() {
+  use pid <- decode.field(0, decode.dynamic)
+  use file_event <- decode.field(1, decode.dynamic)
+  use all_events <- decode.field(2, {
+    use path <- decode.field(0, charlist_decoder())
+    use events <- decode.field(1, decode.list(of: event_decoder()))
+    decode.success(#(path, events))
+  })
+  decode.success(#(pid, file_event, all_events))
 }
 
 /// Get a `Selector` which can be used to select for filesystem events.
 pub fn selector() -> process.Selector(Change(custom)) {
-  let change_selector =
-    dynamic.tuple3(
-      dynamic.dynamic,
-      dynamic.dynamic,
-      dynamic.tuple2(
-        fn(l) {
-          coerce(l)
-          |> charlist.to_string
-          |> Ok
-        },
-        dynamic.list(of: to_event),
-      ),
-    )
-
-  process.new_selector()
-  |> process.selecting_anything(fn(event) {
-    case change_selector(event) {
-      Ok(#(_pid, _, #(path, events))) -> Change(path: path, events: events)
-      _ -> Change(path: "", events: [])
-    }
-  })
+  use event <- process.selecting_anything(process.new_selector())
+  case decode.run(event, change_decoder()) {
+    Ok(#(_pid, _, #(path, events))) -> Change(path:, events:)
+    _ -> Change(path: "", events: [])
+  }
 }
 
 /// Get an actor `Spec` for the watcher
