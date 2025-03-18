@@ -1,15 +1,16 @@
 name = "filespy"
-version = "0.5.0"
+version = "0.6.0"
 
 description = "Get notified of filesystem events in Gleam"
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "pta2002", repo = "gleam-filespy" }
 
 [dependencies]
-gleam_stdlib = ">= 0.36.0 and < 2.0.0"
-gleam_otp = "~> 0.10"
-gleam_erlang = "~> 0.25"
-fs = "~> 8.6"
+fs = ">= 8.6.0 and < 9.0.0"
+gleam_erlang = ">= 0.25.0 and < 1.0.0"
+gleam_otp = ">= 0.10.0 and < 1.0.0"
+gleam_stdlib = ">= 0.50.0 and < 2.0.0"
 
 [dev-dependencies]
-gleeunit = "~> 1.0.2"
+gleeunit = ">= 1.0.2 and < 2.0.0"
+simplifile = ">= 2.2.0 and < 3.0.0"
