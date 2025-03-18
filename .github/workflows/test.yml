@@ -18,6 +18,7 @@ jobs:
           gleam-version: "1.9.1"
           rebar3-version: "3"
           # elixir-version: "1.15.4"
+      - run: sudo apt update && sudo apt install -y inotify-tools
       - run: gleam format --check src test
       - run: gleam deps download
       - run: gleam test
