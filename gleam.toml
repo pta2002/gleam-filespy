@@ -3,7 +3,7 @@ version = "1.0.0"
 
 description = "Get notified of filesystem events in Gleam"
 licences = ["Apache-2.0"]
-repository = { type = "github", user = "h22roscoe", repo = "gleam-filespy" }
+repository = { type = "github", user = "pta2002", repo = "gleam-filespy" }
 
 [dependencies]
 fs = ">= 11.4.0 and < 12.0.0"
