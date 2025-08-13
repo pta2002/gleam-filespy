@@ -1,3 +1,8 @@
+# v0.7.0
+
+- Adapt to even more recent versions of `gleam_stdlib`, `gleam_erlang`,
+  `fs` and `gleam_otp`
+
 # v0.6.0
 
 - Rewrite decoders, to adapt to `gleam/dynamic/decode`. `gleam_stdlib`

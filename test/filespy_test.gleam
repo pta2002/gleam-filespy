@@ -17,7 +17,7 @@ pub fn main() {
 pub fn file_creation_test() {
   use <- filespy_setup()
   use path, event <- start_filespy()
-  let xattrmod = atom.create_from_string("xattrmod")
+  let xattrmod = atom.create("xattrmod")
   let xattrmod = filespy.Unknown(xattrmod)
   [filespy.Created, xattrmod, filespy.Deleted, filespy.Modified]
   |> list.contains(event)
@@ -39,14 +39,19 @@ fn filespy_setup(next: fn() -> process.Subject(filespy.Change(a))) -> Nil {
   process.sleep(1000)
 
   // Terminate the filespy process & clean the temporary folder.
-  process.send_exit(process.subject_owner(filespy_process))
+  let assert Ok(owner) = process.subject_owner(filespy_process)
+  process.send_exit(owner)
   simplifile.delete("/tmp/filespy") |> should.be_ok
 }
 
-fn start_filespy(handler: fn(String, filespy.Event) -> Nil) {
-  filespy.new()
-  |> filespy.add_dir("/tmp/filespy")
-  |> filespy.set_handler(handler)
-  |> filespy.start()
-  |> should.be_ok
+fn start_filespy(
+  handler: fn(String, filespy.Event) -> Nil,
+) -> process.Subject(filespy.Change(Nil)) {
+  let filespy_actor =
+    filespy.new()
+    |> filespy.add_dir("/tmp/filespy")
+    |> filespy.set_handler(handler)
+    |> filespy.start()
+    |> should.be_ok
+  filespy_actor.data
 }
